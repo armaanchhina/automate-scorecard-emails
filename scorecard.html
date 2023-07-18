@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sobeys Driver Safety Scorecard</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        background-color: #fff;
+      }
+
+      .logo {
+        height: 50px;
+        width: auto;
+      }
+
+      .card {
+        margin: 2rem auto;
+        max-width: 80%;
+        border: none;
+        box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.1);
+      }
+
+      .card-header {
+        font-size: 1.5em;
+        background-color: #007a33;
+        color: #fff;
+        border-bottom: 1px solid #007a33;
+      }
+
+      .list-group-item {
+        border: none;
+        border-bottom: 1px solid #ddd;
+        font-size: 1.2em;
+        padding: 1rem 1.25rem;
+      }
+
+      .list-group-item span {
+        font-weight: 700;
+      }
+
+      .list-group-item:last-child {
+        border-bottom: none;
+      }
+
+      .indented {
+        padding-left: 50px;
+        font-size: 1em;
+      }
+
+      .progress {
+        height: 1.5rem;
+      }
+
+      .progress-bar {
+        background-color: #007a33;
+      }
+
+      .progress-bar.bg-warning {
+        background-color: #fbc02d;
+      }
+
+      .progress-bar.bg-danger {
+        background-color: #c8102e;
+      }
+
+      .legend {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1rem;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-right: 1rem;
+      }
+
+      .circle {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+      }
+
+      .circle:last-child {
+        margin-right: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center my-2">
+          <img
+            src="https://drive.google.com/file/d/1b7iH6bC5gkhxH-5l-M8YONBHEGeIcwaL/preview"
+            alt="Sobeys Logo"
+            class="logo"
+          />
+          <h1 class="mt-3">Driver Safety Scorecard</h1>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header text-center">
+          Driver ID: <span id="driver-id">{{driverId}}</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">
+            Total Bonus: $<span id="total-bonus"
+              >{{"{:.2f}".format(driverData["Total Bonus"])}}</span
+            >
+          </li>
+          <li class="list-group-item">
+            Idle Deduct: $<span id="idle-deduct"
+              >{{"{:.2f}".format(driverData["Idle Deduct"])}}</span
+            >
+            <div class="indented">
+              Idle Percentage:
+              <span id="idle-perct"
+                >{{"{:.2f}".format(driverData["Idle Percent"])}}</span
+              >%
+            </div>
+          </li>
+          <li class="list-group-item">
+            MPG Deduct: $<span id="mpg-deduct"
+              >{{"{:.2f}".format(driverData["MPG Deduct"])}}</span
+            >
+            <div class="indented">
+              MPG:
+              <span id="mpg"
+                >{{"{:.2f}".format(driverData["Efficiency"])}}</span
+              >
+            </div>
+          </li>
+          <li class="list-group-item">
+            Harsh Deduct: $<span id="harsh-deduct"
+              >{{"{:.2f}".format(driverData["Harsh Deduct"])}}</span
+            >
+            <div class="indented">
+              Harsh Events:
+              <span id="harsh-events">{{driverData['Harsh Events']}}</span>
+            </div>
+          </li>
+          <li class="list-group-item">
+            Safety Deduct: $<span id="safety-deduct"
+              >{{"{:.2f}".format(driverData["Safety Deduct"])}}</span
+            >
+            <div class="indented">
+              Safety Score:
+              <span id="safety-score">{{driverData['Safety Score']}}</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card mt-5">
+        <div class="card-header text-center">Your Performance Breakdown</div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">
+            <div>
+              <strong>Safety Score:</strong>
+              <span id="user-safety-score">{{driverData["Safety Score"]}}</span>
+            </div>
+            <div class="progress">
+              <div
+                class="progress-bar bg-success"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                98+
+              </div>
+              <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                96-97
+              </div>
+              <div
+                class="progress-bar bg-danger"
+                role="progressbar"
+                style="width: 34%"
+                aria-valuenow="34"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                &lt;=95
+              </div>
+            </div>
+          </li>
+          <li class="list-group-item">
+            <div>
+              <strong>Idle Percentage:</strong>
+              <span id="user-idle-perct"
+                >{{"{:.2f}".format(driverData["Idle Percent"])}}</span
+              >%
+            </div>
+            <div class="progress">
+              <div
+                class="progress-bar bg-success"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                &lt;=7.0
+              </div>
+              <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                7.1-24
+              </div>
+              <div
+                class="progress-bar bg-danger"
+                role="progressbar"
+                style="width: 34%"
+                aria-valuenow="34"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                24.1+
+              </div>
+            </div>
+          </li>
+          <li class="list-group-item">
+            <div>
+              <strong>MPG:</strong>
+              <span id="user-mpg"
+                >{{"{:.2f}".format(driverData["Efficiency"])}}</span
+              >
+            </div>
+            <div class="progress">
+              <div
+                class="progress-bar bg-success"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                &gt;=7.0
+              </div>
+              <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                6.0-6.9
+              </div>
+              <div
+                class="progress-bar bg-danger"
+                role="progressbar"
+                style="width: 34%"
+                aria-valuenow="34"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                &lt;=5.9
+              </div>
+            </div>
+          </li>
+          <li class="list-group-item">
+            <div>
+              <strong>Harsh Events:</strong>
+              <span id="user-harsh-events">{{driverData["Harsh Events"]}}</span>
+            </div>
+            <div class="progress">
+              <div
+                class="progress-bar bg-success"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                0
+              </div>
+              <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: 33%"
+                aria-valuenow="33"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                1
+              </div>
+              <div
+                class="progress-bar bg-danger"
+                role="progressbar"
+                style="width: 34%"
+                aria-valuenow="34"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                2+
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="legend justify-content-center">
+        <div class="legend-item">
+          <div class="circle" style="background-color: #007a33"></div>
+          <span>No Deduct</span>
+        </div>
+        <div class="legend-item">
+          <div class="circle" style="background-color: #fbc02d"></div>
+          <span>Deduct: 25</span>
+        </div>
+        <div class="legend-item">
+          <div class="circle" style="background-color: #c8102e"></div>
+          <span>Deduct: 50</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
