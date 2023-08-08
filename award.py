@@ -1,25 +1,19 @@
 import requests #import library
+import logging
+
 import json
-import re
 import pandas as pd
 import os
-import ast
-import datetime
 import calendar, time
 from urllib.parse import unquote
 from dotenv import load_dotenv
 import concurrent.futures
 from datetime import datetime, timedelta
-import urllib.parse
 load_dotenv()
 SAMSARA_API_TOKEN = os.getenv('SAMSARA_API_TOKEN')
-
+logging.info(SAMSARA_API_TOKEN)
 
 # request = input("Enter url of data needed: " )
-
-import csv
-import json
-import requests
 # url = "https://api.samsara.com/fleet/reports/vehicles/fuel-energy?startDate=2022-03-31T23%3A59%3A59.394843%2B00%3A00&endDate=2022-03-31T23%3A59%3A59.394843%2B00%3A00"
 
 
@@ -94,9 +88,11 @@ def calculate_harsh_deduction(events) -> int:
 
 
 def write_to_csv(data: list) -> pd.DataFrame:
-    df = pd.DataFrame(data, columns=['Driver ID', 'Driver Name', 'Idle Deduct', 'Idle Percent', 'MPG Deduct', 'Efficiency', "Harsh Deduct", "Harsh Events","Safety Deduct","Safety Score", "Total Bonus"])
+    now = datetime.now()
+    df = pd.DataFrame(data, columns=['Driver ID', 'Driver Name', 'Idle Deduct', 'Idle Percent', 'MPG Deduct', 'Efficiency (MPG)', "Harsh Deduct", "Harsh Events","Safety Deduct","Safety Score", "Total Bonus"])
     df = df.sort_values(by="Total Bonus", ascending=False)
-    df.to_csv(OUTPUT_FILE, index=False)
+    df.drop(['Driver Name','Idle Deduct', 'MPG Deduct', 'Harsh Deduct', 'Safety Deduct', 'Total Bonus'], axis=1).to_csv(f"{now.date()}.csv", index=False)
+    # df.to_csv(OUTPUT_FILE, index=False)
     return df
 
 def find_driver(df: pd.DataFrame, driver_id: str, start, end):
@@ -146,7 +142,7 @@ def parse_df(df: pd.DataFrame, start_date_unix: str, end_date_unix: str):
             safety_deduct = calculate_safety_deduction(safety_score_driver)
             final_bonus = INITAL_BONUS - (mpg_deduct + idle_deduct + harsh_cost + safety_deduct)
 
-            data.append([id, name, idle_deduct, idle_perct, mpg_deduct,row["efficiencyMpge"], harsh_cost, harsh_event,safety_deduct, safety_score_driver, final_bonus])
+            data.append([id, name, idle_deduct, round(idle_perct, 2), mpg_deduct,round(row["efficiencyMpge"], 2), harsh_cost, harsh_event,safety_deduct, safety_score_driver, final_bonus])
         return data
 
 
@@ -236,6 +232,25 @@ def get_past_week_dates():
 
     return (week_ago_str, now_str)
 
+def get_past_quarter_dates():
+    now = datetime.now()
+    print(now.date())
+    # Determine the current quarter
+    current_quarter = (now.month - 1) // 3 + 1
+
+    # Calculate the start date of the current quarter
+    current_quarter_start = datetime(now.year, (current_quarter - 1) * 3 + 1, 1)
+
+    # Set the end date as the current day
+    current_day = datetime(now.year, now.month, now.day)
+
+    # Format the dates as strings with the desired format
+    start_date_str = current_quarter_start.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
+    end_date_str = current_day.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
+
+    return (start_date_str, end_date_str)
+
+
     
 
 
@@ -251,13 +266,26 @@ def update_year(year):
     }
 
 
-
+def get_current_quarter():
+    now = datetime.now()
+    year_curr = now.year
+    if(now.month < 4):
+        return f"{year_curr}-01-01T23%3A59%3A59.394843%2B00%3A00"
+    elif(now.month<7):
+        return f"{year_curr}-04-01T23%3A59%3A59.394843%2B00%3A00"
+    elif(now.month<10):
+        return f"{year_curr}-07-01T23%3A59%3A59.394843%2B00%3A00"
+    else:
+        return f"{year_curr}-10-01T23%3A59%3A59.394843%2B00%3A00"
 
 
 
 
 def main():
-    start_date, end_date = get_past_week_dates()
+    print("arrived")
+
+    start_date, end_date = get_past_quarter_dates()
+    start_date = get_current_quarter()
     start_date_unix, end_date_unix = get_in_unix_epoch(start_date, end_date)
     try:
         df_fuel = fuel_and_energy_call(start_date, end_date)
