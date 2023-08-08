@@ -91,8 +91,8 @@ def write_to_csv(data: list) -> pd.DataFrame:
     now = datetime.now()
     df = pd.DataFrame(data, columns=['Driver ID', 'Driver Name', 'Idle Deduct', 'Idle Percent', 'MPG Deduct', 'Efficiency (MPG)', "Harsh Deduct", "Harsh Events","Safety Deduct","Safety Score", "Total Bonus"])
     df = df.sort_values(by="Total Bonus", ascending=False)
-    df.drop(['Driver Name','Idle Deduct', 'MPG Deduct', 'Harsh Deduct', 'Safety Deduct', 'Total Bonus'], axis=1).to_csv(f"{now.date()}.csv", index=False)
-    # df.to_csv(OUTPUT_FILE, index=False)
+    df.drop(['Driver Name','Idle Deduct', 'MPG Deduct', 'Harsh Deduct', 'Safety Deduct', 'Total Bonus'], axis=1).to_csv(f"{now.date()}-without-deducts.csv", index=False)
+    df.to_csv(f"{now.date()}-with-deducts.csv", index=False)
     return df
 
 def find_driver(df: pd.DataFrame, driver_id: str, start, end):
@@ -279,7 +279,24 @@ def get_current_quarter():
         return f"{year_curr}-10-01T23%3A59%3A59.394843%2B00%3A00"
 
 
-
+# def send_email():
+#     # Create a multipart message
+#     msg = MIMEMultipart()
+#     body_part = MIMEText(MESSAGE_BODY, 'plain')
+#     msg['Subject'] = EMAIL_SUBJECT
+#     msg['From'] = EMAIL_FROM
+#     msg['To'] = EMAIL_TO
+#     # Add body to email
+#     msg.attach(body_part)
+#     # open and read the CSV file in binary
+#     with open(PATH_TO_CSV_FILE,'rb') as file:
+#     # Attach the file with filename to the email
+#         msg.attach(MIMEApplication(file.read(), Name=FILE_NAME))
+#     # Create SMTP object    smtp_obj = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+#     # Login to the server    smtp_obj.login(SMTP_USERNAME, SMTP_PASSWORD)
+#     # Convert the message to a string and send it
+#     smtp_obj.sendmail(msg['From'], msg['To'], msg.as_string())
+#     smtp_obj.quit()
 
 def main():
     print("arrived")

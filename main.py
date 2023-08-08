@@ -5,6 +5,8 @@ import tempfile
 import award
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
+from datetime import datetime, timedelta
+
 load_dotenv()
 EMAIL = "armaan_45@hotmail.com"
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
@@ -50,31 +52,31 @@ def job():
         html_out = template.render(driverData=driverData, driverId=driver_id, year="2023", quarter="1")
 
 
-        with open(f'/tmp/scorecards/scorecard_{driver_name}.html', 'w') as f:
+        with open(f'/tmp/scorecards/{driver_name}_scorecard.html', 'w') as f:
             f.write(html_out)
-        pdfkit.from_file(f'/tmp/scorecards/scorecard_{driver_name}.html', 'out.pdf')
+        # pdfkit.from_file(f'/tmp/scorecards/scorecard_{driver_name}.html', 'out.pdf')
         
-        response = doc_api.create_doc({
-        "test": True,                                                   # test documents are free but watermarked
-        "document_content": html_out,    # supply content directly
-        # "document_url": "http://docraptor.com/examples/invoice.html", # or use a url
-        "name": "docraptor-python.pdf",                                 # help you find a document later
-        "document_type": "pdf",                                         # pdf or xls or xlsx
-        # "javascript": True,                                           # enable JavaScript processing
-        # "prince_options": {
-        #   "media": "screen",                                          # use screen styles instead of print styles
-        #   "baseurl": "http://hello.com",                              # pretend URL when using document_content
-        # },
-        })
+        # response = doc_api.create_doc({
+        # "test": True,                                                   # test documents are free but watermarked
+        # "document_content": html_out,    # supply content directly
+        # # "document_url": "http://docraptor.com/examples/invoice.html", # or use a url
+        # "name": "docraptor-python.pdf",                                 # help you find a document later
+        # "document_type": "pdf",                                         # pdf or xls or xlsx
+        # # "javascript": True,                                           # enable JavaScript processing
+        # # "prince_options": {
+        # #   "media": "screen",                                          # use screen styles instead of print styles
+        # #   "baseurl": "http://hello.com",                              # pretend URL when using document_content
+        # # },
+        # })
 
   
-        # send a HTTP request to the server and save
-        # the HTTP response in a response object called r
-        with open('github-sync.pdf', 'w+b') as f:
-            binary_formatted_response = bytearray(response)
-            f.write(binary_formatted_response)
-            f.close()
-        print('Successfully created github-sync.pdf!')
+        # # send a HTTP request to the server and save
+        # # the HTTP response in a response object called r
+        # with open('github-sync.pdf', 'w+b') as f:
+        #     binary_formatted_response = bytearray(response)
+        #     f.write(binary_formatted_response)
+        #     f.close()
+        # print('Successfully created github-sync.pdf!')
             
     # Create zip file in the same directory
     with zipfile.ZipFile('/tmp/scorecards/scorecards.zip', 'w') as zipf:
@@ -89,13 +91,29 @@ def send_zip_file():
     msg['To'] = 'armaan_47@outlook.com'
     msg['Subject'] = 'Scorecard HTMLs'
 
-    part = MIMEBase('application', "octet-stream")
+    part_zip = MIMEBase('application', "octet-stream")
     with open("/tmp/scorecards/scorecards.zip", 'rb') as file:  
-        part.set_payload(file.read())
-    encoders.encode_base64(part)
+        part_zip.set_payload(file.read())
+    encoders.encode_base64(part_zip)
 
-    part.add_header('Content-Disposition', 'attachment', filename='scorecards.zip')  # or whatever the zip is named
-    msg.attach(part)
+    part_zip.add_header('Content-Disposition', 'attachment', filename='scorecards.zip')  # or whatever the zip is named
+    msg.attach(part_zip)
+
+    part_csv = MIMEBase('application', 'octet-stream')
+    now = datetime.now()
+    with open(f'{now.date()}-without-deducts.csv', 'rb') as file:
+        part_csv.set_payload(file.read())
+    encoders.encode_base64(part_csv)
+    part_csv.add_header('Content-Disposition', 'attachment', filename=f'{now.date()}-without-deducts.csv')
+    msg.attach(part_csv)
+
+    part_csv_with_deduct = MIMEBase('application', 'octet-stream')
+    now = datetime.now()
+    with open(f'{now.date()}-with-deducts.csv', 'rb') as file:
+        part_csv_with_deduct.set_payload(file.read())
+    encoders.encode_base64(part_csv_with_deduct)
+    part_csv_with_deduct.add_header('Content-Disposition', 'attachment', filename=f'{now.date()}-with-deducts.csv')
+    msg.attach(part_csv_with_deduct)
 
     server = smtplib.SMTP('smtp-mail.outlook.com', 587)  # SMTP server for Hotmail
     server.starttls()
