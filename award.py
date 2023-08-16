@@ -1,5 +1,6 @@
 import requests #import library
 import logging
+from typing import Tuple, Dict, Union, Any
 
 import json
 import pandas as pd
@@ -88,42 +89,96 @@ def calculate_harsh_deduction(events) -> int:
 
 
 def write_to_csv(data: list) -> pd.DataFrame:
+    """
+    Converts a list of data into a DataFrame, sorts it by "Total Bonus", and writes two CSV files.
+    
+    Args:
+    - data (list): A list containing driver data.
+    
+    Returns:
+    - pd.DataFrame: The DataFrame generated from the provided list.
+    """
+
+    # Get the current date
     now = datetime.now()
-    df = pd.DataFrame(data, columns=['Driver ID', 'Driver Name', 'Idle Deduct', 'Idle Percent', 'MPG Deduct', 'Efficiency (MPG)', "Harsh Deduct", "Harsh Events","Safety Deduct","Safety Score", "Total Bonus"])
+    
+    # Convert the list to a DataFrame
+    df = pd.DataFrame(data, columns=['Driver ID', 'Driver Name', 'Idle Deduct', 'Idle Percent', 'MPG Deduct', 
+                                     'Efficiency (MPG)', "Harsh Deduct", "Harsh Events", "Safety Deduct", 
+                                     "Safety Score", "Total Bonus"])
+
+    # Sort the DataFrame by the "Total Bonus" column in descending order
     df = df.sort_values(by="Total Bonus", ascending=False)
-    df.drop(['Driver Name','Idle Deduct', 'MPG Deduct', 'Harsh Deduct', 'Safety Deduct', 'Total Bonus'], axis=1).to_csv(f"{now.date()}-without-deducts.csv", index=False)
+
+    # Write the DataFrame without certain deduction-related columns to a CSV file
+    df.drop(['Driver Name','Idle Deduct', 'MPG Deduct', 'Harsh Deduct', 'Safety Deduct', 'Total Bonus'], axis=1)\
+      .to_csv(f"{now.date()}-without-deducts.csv", index=False)
+    
+    # Write the full DataFrame to another CSV file
     df.to_csv(f"{now.date()}-with-deducts.csv", index=False)
+    
     return df
 
-def find_driver(df: pd.DataFrame, driver_id: str, start, end):
+
+def find_driver(df: pd.DataFrame, driver_id: str, start: str, end: str) -> list:
+    """
+    Find a specific driver by their ID from the provided DataFrame and calculate various metrics for them.
+    
+    Args:
+    - df (pd.DataFrame): The DataFrame containing driver data.
+    - driver_id (str): The ID of the driver to find.
+    - start (str): The start date in UNIX epoch milliseconds.
+    - end (str): The end date in UNIX epoch milliseconds.
+    
+    Returns:
+    - list: A list containing processed data for the specified driver.
+    """
+    
     data = []
+    
+    # Filter the DataFrame for rows with the specified driver ID
     try:
         df = df[df['driver'].apply(lambda x: x['id'] if isinstance(x, dict) and 'id' in x else None) == driver_id]
     except Exception as e:
         return (f"An error occurred: {e}")
 
-    row, (safety_score_driver, harsh_event, error) = get_safety_score_and_event_count(df.iloc[0],start,end)
+    # Fetch safety score and event count for the specific driver
+    row, (safety_score_driver, harsh_event, error) = get_safety_score_and_event_count(df.iloc[0], start, end)
     if error:
         row, (safety_score_driver, harsh_event, error) = get_safety_score_and_event_count(row, start, end)
-        if(error):
+        if error:
             print(f"Error processing row {row['driver']['name']}: {error}")
             return
+
+    # Calculate deductions and bonuses based on various metrics
     mpg_deduct = calculate_mpg_deduction(row["efficiencyMpge"])
     idle_perct, idle_deduct = calculate_idle_deduction(row["engineRunTimeDurationMs"], row["engineIdleTimeDurationMs"])
     id = row["driver"]["id"]
     name = row["driver"]["name"]
     harsh_cost = calculate_harsh_deduction(harsh_event)
-
     safety_deduct = calculate_safety_deduction(safety_score_driver)
     final_bonus = INITAL_BONUS - (mpg_deduct + idle_deduct + harsh_cost + safety_deduct)
 
-    data.append([id, name, idle_deduct, idle_perct, mpg_deduct,row["efficiencyMpge"], harsh_cost, harsh_event,safety_deduct, safety_score_driver, final_bonus])
+    # Append the processed data to the result list
+    data.append([id, name, idle_deduct, idle_perct, mpg_deduct, row["efficiencyMpge"], harsh_cost, harsh_event, safety_deduct, safety_score_driver, final_bonus])
+    
     print(data)
     return data
 
 def parse_df(df: pd.DataFrame, start_date_unix: str, end_date_unix: str):
+    """
+    Processes a DataFrame to get additional safety scores and event counts for each driver. 
+    Then, calculates various deductions and bonuses based on multiple metrics.
+    
+    Args:
+    - df (pd.DataFrame): The DataFrame containing driver data.
+    - start_date_unix (str): The start date in UNIX epoch milliseconds.
+    - end_date_unix (str): The end date in UNIX epoch milliseconds.
+    
+    Returns:
+    - list: A list of lists containing processed data for each driver.
+    """
     data = []
-    # print(df['driver'].head())
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_row = {executor.submit(get_safety_score_and_event_count, row, start_date_unix, end_date_unix): row for _, row in df.iterrows()}
         for future in concurrent.futures.as_completed(future_to_row):
@@ -150,6 +205,17 @@ def parse_df(df: pd.DataFrame, start_date_unix: str, end_date_unix: str):
 
 
 def fuel_and_energy_call(start_date: int, end_date: int):
+    """
+    Fetch the fuel and energy data for drivers within a specified date range.
+
+    Args:
+    - start_date (int): Start date in UNIX epoch milliseconds.
+    - end_date (int): End date in UNIX epoch milliseconds.
+
+    Returns:
+    - pd.DataFrame: A DataFrame containing driver reports for the specified date range.
+    - str: An error message if an error occurs.
+    """
     url = f"https://api.samsara.com/fleet/reports/drivers/fuel-energy?startDate={start_date}&endDate={end_date}"
     headers = {
         "accept": "application/json",
@@ -168,135 +234,188 @@ def fuel_and_energy_call(start_date: int, end_date: int):
     return df
 
 
-# This function will get safety score and event count for a driver in a certain period
-def get_safety_score_and_event_count(row, start_time: str, end_time: str):
+
+def get_safety_score_and_event_count(row: Dict[str, Dict[str, str]], 
+                                     start_time: str, 
+                                     end_time: str) -> Tuple[Dict[str, Dict[str, str]], Tuple[Union[int, None], Union[int, None], Union[str, None]]]:
+    """
+    Fetch the safety score and the total harsh event count for a driver in a specified time period.
+
+    Args:
+    - row (Dict[str, Dict[str, str]]): Dictionary containing driver details with nested driver id.
+    - start_time (str): Start time in UNIX epoch milliseconds.
+    - end_time (str): End time in UNIX epoch milliseconds.
+
+    Returns:
+    - Tuple: Original data row and a tuple containing:
+      1. Safety Score (int or None)
+      2. Total Harsh Event Count (int or None)
+      3. Error message if an error occurs, otherwise None (str or None)
+    """
+    
     driver_id = row["driver"]["id"]
-    max_retries = 5  # You can adjust this number as needed
+    max_retries = 5  # Maximum number of request retries
     retries = 0
 
     while retries < max_retries:
         try:
+            # Constructing the API URL
             url = f"https://api.samsara.com/v1/fleet/drivers/{driver_id}/safety/score?startMs={start_time}&endMs={end_time}"
+            
+            # Setting the headers for the request
             headers = {
                 "accept": "application/json",
                 "authorization": f"Bearer {SAMSARA_API_TOKEN}"
             }
+
+            # Making the API request
             response = requests.get(url, headers=headers)
 
+            # If we get a 'too many requests' response, wait and then retry
             if response.status_code == 429:
-                retry_after = response.headers.get('Retry-After')  # Retrieve the value of Retry-After header
-                time.sleep(0.5)  # Delay the execution of the next request
+                retry_after = response.headers.get('Retry-After')  # Get the suggested wait time from the API
+                time.sleep(0.5)  # Introducing a wait before retrying
                 retries += 1
-                continue  # Go to next iteration of loop, re-running the request
+                continue  # Continue to the next iteration to retry
 
-            # If response is successful, parse json and return
+            # If response is successful, parse the returned JSON and extract the needed data
             json_data = response.json()
             return row, (json_data["safetyScore"], json_data["totalHarshEventCount"], None)
 
-        except Exception as e:
+        except Exception as e:  # Catching any exception that occurs during the process
             return row, (None, None, f"An error occurred: {e}")
     
-    # If the loop completes without a successful request, return an error
+    # If maximum retries are reached without a successful request, return with an error message
     return row, (None, None, f"An error occurred: Maximum retries reached")
 
 
 
-
-def get_in_unix_epoch(start_date: str, end_date: str):
+def get_in_unix_epoch(start_date: str, end_date: str) -> Tuple[int, int]:
+    """
+    Convert the given URL-encoded ISO8601 date strings to UNIX epoch time.
+    
+    Parameters:
+    - start_date (str): URL-encoded start date string in ISO8601 format.
+    - end_date (str): URL-encoded end date string in ISO8601 format.
+    
+    Returns:
+    - tuple: A tuple containing two integers:
+        1. UNIX epoch time for the start of the 'start_date' in milliseconds.
+        2. UNIX epoch time for the end of the 'end_date' in milliseconds.
+    """
+    
+    # Decode the URL-encoded date strings.
     decoded_start = unquote(start_date)
     decoded_end = unquote(end_date)
+    
+    # Extract just the date portion from the decoded strings.
     date_start = decoded_start.split("T")[0]
     date_end = decoded_end.split("T")[0]
+    
+    # Append the time to the extracted dates to represent the start and end of the days respectively.
     date_start_final = f'{date_start} 01:01:00'
     date_end_final = f'{date_end} 23:00:00'
-
+    
+    # Convert the final date strings to UNIX epoch time in milliseconds.
     unix_epoch_start = (calendar.timegm(time.strptime(date_start_final, '%Y-%m-%d %H:%M:%S'))) * 1000
     unix_epoch_end = (calendar.timegm(time.strptime(date_end_final, '%Y-%m-%d %H:%M:%S'))) * 1000
-
-    print(unix_epoch_end, unix_epoch_start)
+    
+    # For debugging purposes, print the dates.
+    print("Start Epoch:", unix_epoch_start)
+    print("End Epoch:", unix_epoch_end)
+    
     return unix_epoch_start, unix_epoch_end
 
 
 
 
-
-def get_past_week_dates():
+def get_past_week_dates() -> Tuple[str, str]:
+    """
+    Determines the current date and the date exactly one week ago.
+    
+    Returns:
+        tuple: A tuple containing two strings:
+            1. Date exactly one week ago in the desired format.
+            2. Current date in the same format.
+    """
+    
+    # Get the current date and time
     now = datetime.now()
-    week_ago = now - timedelta(days=7)
 
-    # Format the dates as strings with the format you've specified
+    # Calculate the date exactly one week ago from 'now'
+    week_ago = now - timedelta(days=7)
+    
+    # Format the dates to the specific format. This format seems to be 
+    # tailored for URLs and includes URL-encoded colons and plus signs.
     now_str = now.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
     week_ago_str = week_ago.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
-    print(week_ago_str)
-    print(now_str)
+    
+    # For debugging purposes, print the dates
+    print("One week ago:", week_ago_str)
+    print("Now:", now_str)
 
     return (week_ago_str, now_str)
 
-def get_past_quarter_dates():
+def get_past_quarter_dates() -> Tuple[str, str]:
+    """
+    Determines the start date of the current quarter and the current date.
+    
+    Returns:
+        tuple: A tuple containing two strings:
+            1. Start date of the current quarter in a specific format.
+            2. Current date in the same format.
+    """
+    
     now = datetime.now()
-    print(now.date())
+    
     # Determine the current quarter
     current_quarter = (now.month - 1) // 3 + 1
-
+    
     # Calculate the start date of the current quarter
     current_quarter_start = datetime(now.year, (current_quarter - 1) * 3 + 1, 1)
-
+    
     # Set the end date as the current day
     current_day = datetime(now.year, now.month, now.day)
-
+    
     # Format the dates as strings with the desired format
     start_date_str = current_quarter_start.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
     end_date_str = current_day.strftime('%Y-%m-%dT%H%%3A%M%%3A%S.%f%%2B00%%3A00')
-
+    
     return (start_date_str, end_date_str)
+
+# Example usage:
+start, end = get_past_quarter_dates()
+print("Start Date:", start)
+print("End Date:", end)
 
 
     
 
 
-def update_year(year):
-    global CURRENT_YEAR, QUARTERLY
-    CURRENT_YEAR = year
-    QUARTERLY = {
-            #2023-07-05T10%3A05%3A26.240948%2B00%3A00
-        1: (f"{CURRENT_YEAR}-01-01T23%3A59%3A59.394843%2B00%3A00", f"{CURRENT_YEAR}-03-31T23%3A59%3A59.394843%2B00%3A00"), 
-        2: (f"{CURRENT_YEAR}-04-01T23%3A59%3A59.394843%2B00%3A00", f"{CURRENT_YEAR}-06-30T23%3A59%3A59.394843%2B00%3A00"),
-        3: (f"{CURRENT_YEAR}-07-01T23%3A59%3A59.394843%2B00%3A00", f"{CURRENT_YEAR}-09-30T23%3A59%3A59.394843%2B00%3A00"), 
-        4: (f"{CURRENT_YEAR}-10-01T23%3A59%3A59.394843%2B00%3A00", f"{CURRENT_YEAR}-12-31T23%3A59%3A59.394843%2B00%3A00")
-    }
 
 
-def get_current_quarter():
+def get_current_quarter() -> str:
+    """
+    Returns the start date of the current quarter in a specific string format.
+
+    Returns:
+        str: The formatted date string for the start of the current quarter.
+    """
+
     now = datetime.now()
-    year_curr = now.year
-    if(now.month < 4):
-        return f"{year_curr}-01-01T23%3A59%3A59.394843%2B00%3A00"
-    elif(now.month<7):
-        return f"{year_curr}-04-01T23%3A59%3A59.394843%2B00%3A00"
-    elif(now.month<10):
-        return f"{year_curr}-07-01T23%3A59%3A59.394843%2B00%3A00"
+    current_year = now.year
+
+    # Based on the month, determine the quarter and return the appropriate string format.
+    if now.month < 4:
+        return f"{current_year}-01-01T23%3A59%3A59.394843%2B00%3A00"
+    elif now.month < 7:
+        return f"{current_year}-04-01T23%3A59%3A59.394843%2B00%3A00"
+    elif now.month < 10:
+        return f"{current_year}-07-01T23%3A59%3A59.394843%2B00%3A00"
     else:
-        return f"{year_curr}-10-01T23%3A59%3A59.394843%2B00%3A00"
+        return f"{current_year}-10-01T23%3A59%3A59.394843%2B00%3A00"
 
 
-# def send_email():
-#     # Create a multipart message
-#     msg = MIMEMultipart()
-#     body_part = MIMEText(MESSAGE_BODY, 'plain')
-#     msg['Subject'] = EMAIL_SUBJECT
-#     msg['From'] = EMAIL_FROM
-#     msg['To'] = EMAIL_TO
-#     # Add body to email
-#     msg.attach(body_part)
-#     # open and read the CSV file in binary
-#     with open(PATH_TO_CSV_FILE,'rb') as file:
-#     # Attach the file with filename to the email
-#         msg.attach(MIMEApplication(file.read(), Name=FILE_NAME))
-#     # Create SMTP object    smtp_obj = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-#     # Login to the server    smtp_obj.login(SMTP_USERNAME, SMTP_PASSWORD)
-#     # Convert the message to a string and send it
-#     smtp_obj.sendmail(msg['From'], msg['To'], msg.as_string())
-#     smtp_obj.quit()
 
 def main():
     print("arrived")
